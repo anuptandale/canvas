@@ -5,10 +5,10 @@ import ImageIcon from '@mui/icons-material/Image';
 import { ColorPicker, useColor } from "react-color-palette";
 import "react-color-palette/css";
 
-const page = () => {
-  const [image, setImage] = useState(null);
-  const [text, setText] = useState("")
-  const [cta, setCta] = useState("")
+const Page = () => {
+  const [image, setImage] = useState<any>(null);
+  const [text, setText] = useState<string>("")
+  const [cta, setCta] = useState<string>("")
   const [color, setColor] = useColor("#561ecb");
   const [selColor, setSelColor] = useState("red");
   const handleImageChange = (e: any) => {
@@ -82,4 +82,4 @@ const page = () => {
   )
 }
 
-export default page;
+export default Page;
