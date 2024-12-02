@@ -1,3 +1,4 @@
+import os
 import imaplib
 import email
 from email.header import decode_header
@@ -6,7 +7,7 @@ from email.header import decode_header
 IMAP_SERVER = os.getenv("IMAP_SERVER")
 EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-REPO = os.getenv("REPO")
+REPO = os.getenv("REPO")  # Not used in the current script
 
 def fetch_emails_with_subject(subject_filter):
     try:
@@ -21,16 +22,26 @@ def fetch_emails_with_subject(subject_filter):
         status, messages = mail.search(None, f'SUBJECT "{subject_filter}"')
         
         if status != "OK":
-            print("No messages found!")
+            print("Error searching emails!")
+            return []
+        
+        email_ids = messages[0].split()
+        
+        if not email_ids:
+            print(f"No emails found with subject '{subject_filter}'.")
             return []
         
         # List to hold email data
         email_list = []
         
         # Loop through the email IDs
-        for email_id in messages[0].split():
+        for email_id in email_ids:
             # Fetch the email by ID
             status, msg_data = mail.fetch(email_id, "(RFC822)")
+            
+            if status != "OK":
+                print(f"Error fetching email ID {email_id.decode()}.")
+                continue  # Skip to the next email
             
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
@@ -46,13 +57,25 @@ def fetch_emails_with_subject(subject_filter):
                     sender = msg.get("From")
                     
                     # Extract the email body
+                    body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
-                            if part.get_content_type() == "text/plain":
-                                body = part.get_payload(decode=True).decode()
-                                break
+                            content_type = part.get_content_type()
+                            content_disposition = str(part.get("Content-Disposition"))
+                            
+                            # Skip attachments
+                            if "attachment" in content_disposition:
+                                continue
+                            
+                            if content_type == "text/plain":
+                                charset = part.get_content_charset() or "utf-8"
+                                body = part.get_payload(decode=True).decode(charset, errors="replace")
+                                break  # Stop after finding the first text/plain part
                     else:
-                        body = msg.get_payload(decode=True).decode()
+                        content_type = msg.get_content_type()
+                        if content_type == "text/plain":
+                            charset = msg.get_content_charset() or "utf-8"
+                            body = msg.get_payload(decode=True).decode(charset, errors="replace")
                     
                     # Append email details to the list
                     email_list.append({"subject": subject, "sender": sender, "body": body})
@@ -61,8 +84,11 @@ def fetch_emails_with_subject(subject_filter):
         mail.logout()
         return email_list
 
+    except imaplib.IMAP4.error as imap_err:
+        print(f"IMAP error occurred: {imap_err}")
+        return []
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An unexpected error occurred: {e}")
         return []
 
 # Main logic
@@ -71,7 +97,7 @@ if __name__ == "__main__":
     emails = fetch_emails_with_subject(subject_filter)
     
     if emails:
-        print(f"Found {len(emails)} emails with subject '{subject_filter}':")
+        print(f"Found {len(emails)} email(s) with subject '{subject_filter}':")
         for i, email_data in enumerate(emails, start=1):
             print(f"\nEmail {i}:")
             print(f"Subject: {email_data['subject']}")
